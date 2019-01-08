@@ -45,12 +45,14 @@ pagina
 
     if(!fs.existsSync("img/")){
       fs.mkdirSync("img/");
-      if (!fs.existsSync(`img/${respuesta.tablon}`)){
-        fs.mkdirSync(`img/${respuesta.tablon}/`);
-        if (!fs.existsSync(`img/${respuesta.tablon}/${respuesta.hilo}`)){
-          fs.mkdirSync(`img/${respuesta.tablon}//${respuesta.hilo}`);
-        }
-      }
+    }
+
+    if (!fs.existsSync(`img/${respuesta.tablon}`)){
+      fs.mkdirSync(`img/${respuesta.tablon}/`);
+    }
+
+    if (!fs.existsSync(`img/${respuesta.tablon}/${respuesta.hilo}`)){
+      fs.mkdirSync(`img/${respuesta.tablon}//${respuesta.hilo}`);
     }
 
     for(let i = 0; i < respuesta.imagenes.length; i++) {
