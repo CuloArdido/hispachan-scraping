@@ -12,6 +12,10 @@ function setCharAt (str,index,chr) {
 
 const pagina = new Promise((resolve, reject) => {
   let imagenes = [];
+  //I'd move the tablon and hilo variables up to the top and have them be module level variables instead of only local to this function.
+  //that way you can more easily have access to them in your other functions. Normally doing variables like that isn't
+  //really great (having a bunch of "global" variables) but since this is a one off script and those 2 variables are never
+  //overwritten anywhere, it is safe and convenient here
   const tablon = argv.tablon;
   const hilo = argv.hilo;
   const url = `https://www.hispachan.org/${tablon}/res/${hilo}.html`;
@@ -27,9 +31,13 @@ const pagina = new Promise((resolve, reject) => {
         imagenes.push(src);
       });
     }
+    //I would call resolve({imagenes, tablon, hilo here})
     if (error) reject(error);
   });
 
+  //setting a timeout here for 5 seconds and "hoping" everything is done is an anti-pattern.
+  //A better way would be to call the resolve function up inside the request method right after getting all the
+  //imagenes strings.
   setTimeout(() => {
     resolve({
       imagenes,
@@ -39,10 +47,17 @@ const pagina = new Promise((resolve, reject) => {
   }, 5000);
 });
 
+//for your use case here, making your own Promise pagina and calling .then() on it probably wasn't necessary.
+//you could have put your mkdirSync and for-loop with request inside of the callback of the original request (after you load cheerio and get the 
+//src urls)
 pagina
   .then(respuesta => {
     console.log(respuesta);
 
+    //This isn't too bad since this is a 1-off script. But just remember that if this was code that was being run on a 
+    //server, you NEVER want to use the Sync methods. 
+    //Maybe 1 way to clean it up a tiny bit would be to put all 3 of these if and mkdirSync statements into their own function
+    //called ensureDirectories() or something
     if(!fs.existsSync("img/")){
       fs.mkdirSync("img/");
     }
