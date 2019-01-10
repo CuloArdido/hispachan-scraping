@@ -15,7 +15,7 @@ const pagina = new Promise((resolve, reject) => {
   //I'd move the tablon and hilo variables up to the top and have them be module level variables instead of only local to this function.
   //that way you can more easily have access to them in your other functions. Normally doing variables like that isn't
   //really great (having a bunch of "global" variables) but since this is a one off script and those 2 variables are never
-  //overwritten anywhere, it is safe and convenient here
+  //overwritten anywhere, it is safe and convenient in this use case
   const tablon = argv.tablon;
   const hilo = argv.hilo;
   const url = `https://www.hispachan.org/${tablon}/res/${hilo}.html`;
@@ -31,7 +31,7 @@ const pagina = new Promise((resolve, reject) => {
         imagenes.push(src);
       });
     }
-    //I would call resolve({imagenes, tablon, hilo here})
+    //I would call resolve({imagenes, tablon, hilo }) here
     if (error) reject(error);
   });
 
