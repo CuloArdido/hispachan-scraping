@@ -17,7 +17,12 @@ if peticion.status_code == 200:
         print("Descargando %s (%s)" % (archivo, nombre))
         descarga = requests.get(archivo)
         # El archivo basicamente se guarda en tablon/post/nombre
-        salida = open(os.path.join(tablon, idpost, nombre), "wb")
+        # Al parecer las imagenes dentro de un spoiler no contienen nombre propio
+        # por lo que se usa el timestamp en su lugar
+        if nombre == "Spoiler Picture.jpg":
+            salida = open(os.path.join(tablon, idpost, archivo.split("/")[-1]), "wb")
+        else:
+            salida = open(os.path.join(tablon, idpost, nombre), "wb")
         salida.write(descarga.content)
         salida.close()
 else: print("El hilo no existe")
