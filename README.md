@@ -1,6 +1,4 @@
-# Web-Scraping
-
----
+# Web-Scraping (Node.js)
 
 ## Descripción
 
@@ -25,3 +23,12 @@ No me hago responsable por el mal uso o daños a otros realizados por esta herra
 
 ## Bugs conocidos:
 No descarga los videos, los selecciona pero aun no los maneja
+
+---
+# hispachan-scraping.py
+## Descripción
+Versión simplificada del scrapper hecha en Python.
+## Uso
+`python hispachan-scraping.py enlace_hilo`
+## Bugs conocidos
+Ninguno por ahora, pero faltaría afinar el manejo de excepciones y hacer mas pruebas con la expresión regular que detecta enlaces y nombres reales de los archivos.
