@@ -26,6 +26,9 @@ adjuntos = re.compile('<span class="file(?:namereply|size)">[\r\n]+<a[\s\r\n]+ta
 enlace = re.compile("https?://(?:www\.)?hispachan\.org/([a-z]+)/res/([0-9]+)\.html")
 
 def getthreadinfo(url):
+    if enlace.match(url) == None:
+        print("Error: url invalida")
+        exit(1)
     board, thread = enlace.match(url).groups()
     return (board, thread)
 
@@ -213,8 +216,6 @@ if __name__ == "__main__":
         showusage()
 
     r = getthreadinfo(args.pop(0))
-    if not r:
-        print("Error: url invalida")
 
     url = "https://hispachan.org/{}/res/{}.html".format(r[0], r[1])
     try:
