@@ -27,8 +27,27 @@ No descarga los videos, los selecciona pero aun no los maneja
 ---
 # hispachan-scraping.py
 ## Descripción
-Versión simplificada del scrapper hecha en Python.
+Versión del scrapper hecha en Python. Actualmente se encuentra en [esta rama](tree/python).
+## Dependencias
+Python 3.
 ## Uso
-`python hispachan-scraping.py enlace_hilo`
+
+```
+Uso: hispachan-scraping.py [opciones] <url del hilo o tablon/hilo> [<destino>]
+Opciones:
+    -no-subfolder     Omite la creación de una subcarpeta para las imágenes.
+    -overwrite        Sobrescribe los archivos con el mismo nombre.
+    -update           Solo descarga los archivos que no existen.
+```
+
 ## Bugs conocidos
-Ninguno por ahora, pero faltaría afinar el manejo de excepciones y hacer mas pruebas con la expresión regular que detecta enlaces y nombres reales de los archivos.
+Ninguno por ahora, pero faltaría hacer mas pruebas con la expresión regular que detecta enlaces y nombres reales de los archivos.
+
+## Por hacer
+☐ Agregar un modo de depuración/verbose (al menos para mostrar mas detalles cuando se da una excepción).
+
+☐ Hacer que funcione en Python 2.
+
+☐ Agregar soporte para descargar desde varios hilos a la vez (ya sea en la consola o a través de un archivo).
+
+☐ Quizás crear una interfaz gráfica y/o una webapp.
