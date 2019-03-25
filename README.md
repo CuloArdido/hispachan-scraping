@@ -27,7 +27,7 @@ No descarga los videos, los selecciona pero aun no los maneja
 ---
 # hispachan-scraping.py
 ## Descripción
-Versión del scrapper hecha en Python. Actualmente se encuentra en [esta rama](tree/python).
+Versión del scrapper hecha en Python. Actualmente se encuentra en [esta rama](../../tree/python).
 ## Dependencias
 Python 3.
 ## Uso
