@@ -1,28 +1,241 @@
 # -*- coding: utf-8 -*-
-import requests, re, sys, os
+import sys
+import os
+import re
+import threading
+import queue
+import time
 
-enlace = re.compile("https?://(www\.)?hispachan\.org/([a-z]+)/res/([0-9]+)\.html")
-x, tablon, idpost = enlace.match(sys.argv[1]).groups()
+import urllib.request
+import urllib.error
+
+URLError = urllib.error.URLError
+
+
+# flags
+subfolder = None
+overwrite = None
+update    = None
+
+# shared stuff
+nbitsmutx = threading.Lock()
+nbits     = 0
+
+# Expresiones regulares para evitar escribir codigo innecesariamente complejo
 adjuntos = re.compile('<span class="file(?:namereply|size)">[\r\n]+<a[\s\r\n]+target="_blank"[\s\r\n]+href="([^"]+)"(?:[\s\S]*?)<span class="nombrefile"(?:>, ([^<]+)| title="([^"]+))')
-peticion = requests.get("https://www.hispachan.org/%s/res/%s.html" % (tablon, idpost))
-# Si el hilo aun existe extrae los archivos
-if peticion.status_code == 200:
-    try: os.makedirs(os.path.join(tablon, idpost))
-    except OSError, e:
-        if e.errno == os.errno.EEXIST:
-            respuesta = raw_input("La carpeta donde se descargaran los archivos ya existe. ¿Desea sobreescribir los archivos? [s/n]: ")
-            if respuesta in ["n", "N"]: exit(17)
-    for archivo, nombre1, nombre2 in adjuntos.findall(peticion.content):
-        nombre = (nombre1 if nombre2 == "" else nombre2)
-        print("Descargando %s (%s)" % (archivo, nombre))
-        descarga = requests.get(archivo)
-        # El archivo basicamente se guarda en tablon/post/nombre
-        # Al parecer las imagenes dentro de un spoiler no contienen nombre propio
-        # por lo que se usa el timestamp en su lugar
-        if nombre == "Spoiler Picture.jpg":
-            salida = open(os.path.join(tablon, idpost, archivo.split("/")[-1]), "wb")
-        else:
-            salida = open(os.path.join(tablon, idpost, nombre), "wb")
-        salida.write(descarga.content)
-        salida.close()
-else: print("El hilo no existe")
+enlace = re.compile("https?://(?:www\.)?hispachan\.org/([a-z]+)/res/([0-9]+)\.html")
+
+def getthreadinfo(url):
+    board, thread = enlace.match(url).groups()
+    return (board, thread)
+
+
+def getimglist(url):
+    opener = urllib.request.build_opener()
+    opener.addheaders = [
+        ('User-agent', 'Mozilla/5.0')
+    ]
+    try:
+        f = opener.open(url, timeout=20)
+        b = f.read()
+    except URLError:
+        raise
+    f.close()
+
+    return adjuntos.findall(b.decode('utf-8'))
+
+
+def subprocess(iqueue, oqueue):
+    while True:
+        tmp = iqueue.get()
+        if not tmp:
+            break
+
+        if saveimg(tmp[0], tmp[1]):
+            oqueue.put((tmp[0], True))
+            continue
+        oqueue.put((tmp[0], False))
+
+
+def saveimg(url, path):
+    global nbits
+    global nbitsmutx
+
+    opener = urllib.request.build_opener()
+    opener.addheaders = [
+        ('User-agent', 'Mozilla/5.0')
+    ]
+    try:
+        f = opener.open(url, timeout=120)
+    except URLError:
+        print(url)
+        raise
+    except:
+        print(url)
+        raise
+
+    if os.path.isfile(path):
+        if update:
+            try:
+                sz1 = int(f.info()["Content-Length"])
+
+                fh = open(path, "rb")
+                fh.seek(0, 2)
+                sz2 = fh.tell()
+                fh.close()
+            except:
+                return False
+
+            if sz1 == sz2:
+                return True
+
+        # si el archivo existe intentamos con un nuevo nombre
+        if not update and not overwrite:
+            fnme, fext = os.path.splitext(path)
+
+            i = 1
+            while os.path.isfile(path):
+                path = fnme + "(" + str(i) +")" + fext
+                i += 1
+
+    try:
+        fh = open(path, "wb")
+        while True:
+            b = f.read(4096)
+            if not b:
+                break
+
+            nbitsmutx.acquire()
+            nbits += len(b)
+            nbitsmutx.release()
+
+            fh.write(b)
+        fh.close()
+    except (IOError, URLError):
+        raise
+    except:
+        raise
+    return True
+
+
+def saveimages(ilist, dpath):
+    global nbits
+
+    path = os.path.abspath(dpath)
+    try:
+        os.makedirs(path)
+    except FileExistsError:
+        pass
+
+    print("Descargando {} imagenes en \n[{}]".format(len(ilist), path))
+
+    iqueue = queue.Queue()
+    oqueue = queue.Queue()
+
+    threads = []
+    for i in range(4):
+        thr = threading.Thread(target=subprocess, args=(iqueue, oqueue))
+        thr.daemon = True
+        thr.start()
+        threads.append(thr)
+
+    for img in ilist:
+        if not img[0]:
+            continue
+
+        link = img[0]
+        name = img[1]
+        if img[2]:
+            name = img[2]
+        iqueue.put((link, os.path.join(path, name)))
+
+    f = 0
+    i = 0
+    try:
+        while i < len(ilist):
+            while not oqueue.empty():
+                r = oqueue.get()
+                
+                print("\r..." + r[0][8:], end=" ")
+                if not r[1]:
+                    print("[FAILED]", end="")
+                    f += 1
+                print()
+                i += 1
+
+            print("\r{}Kb".format(nbits >> 10), end="")
+            time.sleep(0.15)
+    except KeyboardInterrupt:
+        exit()
+
+    print("\r{}Kb".format(nbits >> 10))
+    print("Terminado: archivos descargados {}, errores {}".format(i - f, f))
+
+
+usage = """
+Uso: %s [opciones] <url del hilo o tablon/hilo> [<destino>]
+Opciones:
+    -no-subfolder     Omite la creacion de una subcarpeta para las imagenes.
+    -overwrite        Sobrescribe los archivos con el mismo nombre.
+    -update           Solo descarga los archivos que no existen.
+""" % sys.argv[0]
+
+
+def showusage():
+    print(usage)
+    exit()
+
+
+if __name__ == "__main__":
+    if len(sys.argv) < 2:
+        showusage()
+    sys.argv.pop(0)
+    args = sys.argv
+
+    # parametros
+    options = {
+        "-no-subfolder": ("subfolder",  True),
+        "-overwrite":    ("overwrite", False),
+        "-update":       ("update",    False)
+    }
+
+    s = globals()
+    for option in options:
+        m = options[option]
+        s[m[0]] = m[1]
+
+    while args[0] in options:
+        a = args.pop(0)
+        if not options[a]:  # parametro duplicado
+            showusage()
+        s[options[a][0]] = not options[a][1]
+        options[a] = None
+
+    if not args or len(args) > 2:
+        showusage()
+
+    r = getthreadinfo(args.pop(0))
+    if not r:
+        print("Error: url invalida")
+
+    url = "https://hispachan.org/{}/res/{}.html".format(r[0], r[1])
+    try:
+        ilist = getimglist(url)
+        if not ilist:
+            print("Error: ningun archivo para descargar")
+            exit()
+
+        dpath = os.getcwd()
+        if args:
+            dpath = args[0]
+        #
+        if subfolder:
+            dpath = os.path.join(dpath, r[0], r[1])
+            saveimages(ilist, dpath)
+    except KeyboardInterrupt:
+        exit()
+    except Exception as e:
+        #print("Error:", e)
+        # Descomentar la siguiente linea y comentar el print de arriba para ver en donde se originan las excepciones
+        # TODO: Agregar un modo de depuracion para gestionar esto
+        raise
