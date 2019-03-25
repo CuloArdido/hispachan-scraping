@@ -68,11 +68,9 @@ def saveimg(url, path):
     try:
         f = opener.open(url, timeout=120)
     except URLError:
-        print(url)
-        raise
+        return False
     except:
-        print(url)
-        raise
+        return False
 
     if os.path.isfile(path):
         if update:
@@ -112,9 +110,9 @@ def saveimg(url, path):
             fh.write(b)
         fh.close()
     except (IOError, URLError):
-        raise
+        return False
     except:
-        raise
+        return False
     return True
 
 
@@ -235,7 +233,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         exit()
     except Exception as e:
-        #print("Error:", e)
-        # Descomentar la siguiente linea y comentar el print de arriba para ver en donde se originan las excepciones
-        # TODO: Agregar un modo de depuracion para gestionar esto
-        raise
+        print("Error:", e)
