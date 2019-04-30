@@ -5,6 +5,7 @@ import re
 import threading
 import queue
 import time
+import gettext
 
 import urllib.request
 import urllib.error
@@ -16,22 +17,23 @@ URLError = urllib.error.URLError
 subfolder = None
 overwrite = None
 update    = None
+debug     = None
 
 # shared stuff
 nbitsmutx = threading.Lock()
 nbits     = 0
 
-# Expresiones regulares para evitar escribir codigo innecesariamente complejo
+# Expresiones regulares para evitar escribir código innecesariamente complejo
 adjuntos = re.compile('<span class="file(?:namereply|size)">[\r\n]+<a[\s\r\n]+target="_blank"[\s\r\n]+href="([^"]+)"(?:[\s\S]*?)<span class="nombrefile"(?:>, ([^<]+)| title="([^"]+))')
-enlace = re.compile("https?://(?:www\.)?hispachan\.org/([a-z]+)/res/([0-9]+)\.html")
+# Detecta el tablón e ID del hilo de un enlace completo o en la forma corta: "/tablón/hilo". 
+enlace = re.compile("(?i)^(?:(?:(?:(?:https?://)?(?:[a-z]+[.])?)?hispachan[.]org/)?|/?)?([a-z]+)/(?:res/)?([0-9]+)(?:[.]html)?")
 
 def getthreadinfo(url):
-    if enlace.match(url) == None:
-        print("Error: url invalida")
-        exit(1)
-    board, thread = enlace.match(url).groups()
-    return (board, thread)
-
+    r = enlace.match(url)
+    if r:
+        return r.groups()
+    print("Error: url invalida")
+    exit(1)
 
 def getimglist(url):
     opener = urllib.request.build_opener()
@@ -41,14 +43,14 @@ def getimglist(url):
     try:
         f = opener.open(url, timeout=20)
         b = f.read()
-    except URLError:
-        raise
+    except URLError as e:
+        raise e
     f.close()
 
     return adjuntos.findall(b.decode('utf-8'))
 
 
-def subprocess(iqueue, oqueue):
+def subproc(iqueue, oqueue):
     while True:
         tmp = iqueue.get()
         if not tmp:
@@ -70,10 +72,12 @@ def saveimg(url, path):
     ]
     try:
         f = opener.open(url, timeout=120)
-    except URLError:
-        return False
-    except:
-        return False
+    except URLError as e:
+        if debug == True: raise e
+        else: return False
+    except Exception as e:
+        if debug == True: raise e
+        else: return False
 
     if os.path.isfile(path):
         if update:
@@ -84,8 +88,9 @@ def saveimg(url, path):
                 fh.seek(0, 2)
                 sz2 = fh.tell()
                 fh.close()
-            except:
-                return False
+            except Exception as e:
+                if debug == True: raise e
+                else: return False
 
             if sz1 == sz2:
                 return True
@@ -112,10 +117,12 @@ def saveimg(url, path):
 
             fh.write(b)
         fh.close()
-    except (IOError, URLError):
-        return False
-    except:
-        return False
+    except (IOError, URLError) as e:
+        if debug == True: raise e
+        else: return False
+    except Exception as e:
+        if debug == True: raise e
+        else: return False
     return True
 
 
@@ -128,14 +135,14 @@ def saveimages(ilist, dpath):
     except FileExistsError:
         pass
 
-    print("Descargando {} imagenes en \n[{}]".format(len(ilist), path))
+    print("Descargando {} imágenes en \n[{}]".format(len(ilist), path))
 
     iqueue = queue.Queue()
     oqueue = queue.Queue()
 
     threads = []
     for i in range(4):
-        thr = threading.Thread(target=subprocess, args=(iqueue, oqueue))
+        thr = threading.Thread(target=subproc, args=(iqueue, oqueue))
         thr.daemon = True
         thr.start()
         threads.append(thr)
@@ -167,71 +174,67 @@ def saveimages(ilist, dpath):
             print("\r{}Kb".format(nbits >> 10), end="")
             time.sleep(0.15)
     except KeyboardInterrupt:
-        exit()
+        exit(1)
 
     print("\r{}Kb".format(nbits >> 10))
     print("Terminado: archivos descargados {}, errores {}".format(i - f, f))
 
+# Traducimos algunos mensajes, para agregar mas idiomas véase también https://stackoverflow.com/questions/22951442/how-to-make-pythons-argparse-generate-non-english-text/28836537#28836537
+def convertArgparseMessages(s):
+    subDict = \
+    {'positional arguments':'Argumentos posicionales',
+    'optional arguments':'Argumentos opcionales',
+    'usage: ':'Uso: ',
+    'the following arguments are required: %s':'los siguientes parámetros son requeridos: %s'
+    #'show this help message and exit':'Affiche ce message et quitte'
+    }
+    if s in subDict:
+        s = subDict[s]
+    return s
 
-usage = """
-Uso: %s [opciones] <url del hilo o tablon/hilo> [<destino>]
-Opciones:
-    -no-subfolder     Omite la creacion de una subcarpeta para las imagenes.
-    -overwrite        Sobrescribe los archivos con el mismo nombre.
-    -update           Solo descarga los archivos que no existen.
-""" % sys.argv[0]
-
-
-def showusage():
-    print(usage)
-    exit()
-
+gettext.gettext = convertArgparseMessages
+import argparse
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        showusage()
-    sys.argv.pop(0)
-    args = sys.argv
+    parser = argparse.ArgumentParser(add_help=False, description=('Descarga los archivos adjuntos de un hilo de Hispachan.'))
+    parser.add_argument('url', help='Enlace del hilo o identificador en la forma "tablón/hilo".')
+    parser.add_argument('destino', nargs='?', help='Directorio en donde se guardaran los archivos (por defecto se descargan en el directorio actual).', default=os.getcwd())
+    parser.add_argument( '-h', '-help', action='help', default=argparse.SUPPRESS, help='Muestra este mensaje de ayuda y sale.')
+    parser.add_argument('-n', '-no-subfolder', dest='subfolder', help='Omite la creación de una subcarpeta para las imágenes.', default=True, action='store_false')
+    parser.add_argument('-o', '-overwrite', dest="overwrite", help='Sobrescribe los archivos con el mismo nombre.', default=False, action='store_true')
+    parser.add_argument('-u', '-update', dest="update", help='Solo descarga los archivos que no existen.', default=False, action='store_true')
+    parser.add_argument('-d', '-debug', dest="debug",  help='Dispara las excepciones para facilitar la detección de bugs.', default=False, action='store_true')
 
-    # parametros
-    options = {
-        "-no-subfolder": ("subfolder",  True),
-        "-overwrite":    ("overwrite", False),
-        "-update":       ("update",    False)
-    }
 
+    # Si no hay enlace entonces se muestra la ayuda y sale
+    if len(sys.argv)==1:
+        parser.print_help()
+        sys.exit(1)
+    
+    args = parser.parse_args(sys.argv[1:])
+    
+    # Asignamos algunas variables globales predefinidas en el script
     s = globals()
-    for option in options:
-        m = options[option]
-        s[m[0]] = m[1]
+    for option in ["subfolder", "overwrite", "update", "debug"]:
+        s[option] = getattr(args, option)
 
-    while args[0] in options:
-        a = args.pop(0)
-        if not options[a]:  # parametro duplicado
-            showusage()
-        s[options[a][0]] = not options[a][1]
-        options[a] = None
-
-    if not args or len(args) > 2:
-        showusage()
-
-    r = getthreadinfo(args.pop(0))
+    r = getthreadinfo(args.url)
 
     url = "https://hispachan.org/{}/res/{}.html".format(r[0], r[1])
     try:
         ilist = getimglist(url)
         if not ilist:
-            print("Error: ningun archivo para descargar")
+            print("error: ningún archivo para descargar")
             exit()
 
-        dpath = os.getcwd()
-        if args:
-            dpath = args[0]
-        #
+        dpath = args.destino
+        
         if subfolder:
             dpath = os.path.join(dpath, r[0], r[1])
-            saveimages(ilist, dpath)
+            
+        saveimages(ilist, dpath)
     except KeyboardInterrupt:
-        exit()
+        exit(1)
     except Exception as e:
-        print("Error:", e)
+        if debug == True: raise e
+        else: print("error:", e)
