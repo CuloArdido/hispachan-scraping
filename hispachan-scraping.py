@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# Importamos el print que se usa en Python 3 (lo ideal seria que solo funcione
+# en Python 2 pero el interprete no lo acepta de esa manera)
+from __future__ import print_function
 import sys
 import os
 import re
@@ -7,11 +10,14 @@ import queue
 import time
 import gettext
 
-import urllib.request
-import urllib.error
-
-URLError = urllib.error.URLError
-
+if sys.version_info.major == 2:
+    from urllib2 import build_opener, URLError
+else:
+    from urllib import request
+    import urllib.error
+    
+    build_opener = urllib.request.build_opener
+    URLError = urllib.error.URLError    
 
 # flags
 subfolder = None
@@ -28,6 +34,27 @@ adjuntos = re.compile('<span class="file(?:namereply|size)">[\r\n]+<a[\s\r\n]+ta
 # Detecta el tablón e ID del hilo de un enlace completo o en la forma corta: "/tablón/hilo". 
 enlace = re.compile("(?i)^(?:(?:(?:(?:https?://)?(?:[a-z]+[.])?)?hispachan[.]org/)?|/?)?([a-z]+)/(?:res/)?([0-9]+)(?:[.]html)?")
 
+# Dispara la excepcion o devuelve False dependiendo en base al parametro debug
+def debugger(excepcion, show_exception = False):
+    if debug == True: raise excepcion
+    else:
+        if show_exception == True: print("error:", e)
+        return False
+
+# Devuelve un objeto para manejar peticiones HTTP o False en caso de una excepcion
+def url_opener(url, time_out):
+    useragent = 'Mozilla/5.0'
+    opener = build_opener()
+    opener.addheaders = [
+        ('User-agent', useragent)
+    ]
+    try:
+        return opener.open(url, timeout=time_out)
+    except URLError as e:
+        debugger(e)
+    except Exception as e:
+        debugger(e)
+
 def getthreadinfo(url):
     r = enlace.match(url)
     if r:
@@ -36,19 +63,11 @@ def getthreadinfo(url):
     exit(1)
 
 def getimglist(url):
-    opener = urllib.request.build_opener()
-    opener.addheaders = [
-        ('User-agent', 'Mozilla/5.0')
-    ]
-    try:
-        f = opener.open(url, timeout=20)
-        b = f.read()
-    except URLError as e:
-        raise e
+    f = url_opener(url, 20)
+    b = f.read()
     f.close()
 
     return adjuntos.findall(b.decode('utf-8'))
-
 
 def subproc(iqueue, oqueue):
     while True:
@@ -61,23 +80,11 @@ def subproc(iqueue, oqueue):
             continue
         oqueue.put((tmp[0], False))
 
-
 def saveimg(url, path):
     global nbits
     global nbitsmutx
 
-    opener = urllib.request.build_opener()
-    opener.addheaders = [
-        ('User-agent', 'Mozilla/5.0')
-    ]
-    try:
-        f = opener.open(url, timeout=120)
-    except URLError as e:
-        if debug == True: raise e
-        else: return False
-    except Exception as e:
-        if debug == True: raise e
-        else: return False
+    f = url_opener(url, 120)
 
     if os.path.isfile(path):
         if update:
@@ -89,8 +96,7 @@ def saveimg(url, path):
                 sz2 = fh.tell()
                 fh.close()
             except Exception as e:
-                if debug == True: raise e
-                else: return False
+                debugger(e)
 
             if sz1 == sz2:
                 return True
@@ -118,13 +124,10 @@ def saveimg(url, path):
             fh.write(b)
         fh.close()
     except (IOError, URLError) as e:
-        if debug == True: raise e
-        else: return False
+        debugger(e)
     except Exception as e:
-        if debug == True: raise e
-        else: return False
+        debugger(e)
     return True
-
 
 def saveimages(ilist, dpath):
     global nbits
@@ -132,8 +135,11 @@ def saveimages(ilist, dpath):
     path = os.path.abspath(dpath)
     try:
         os.makedirs(path)
-    except FileExistsError:
-        pass
+    except OSError as e:
+        if e.errno == os.errno.EEXIST:
+            print('El directorio %s ya se habia creado con anterioridad' % dpath)
+        else:
+            raise
 
     print("Descargando {} imágenes en \n[{}]".format(len(ilist), path))
 
@@ -205,7 +211,6 @@ if __name__ == "__main__":
     parser.add_argument('-u', '-update', dest="update", help='Solo descarga los archivos que no existen.', default=False, action='store_true')
     parser.add_argument('-d', '-debug', dest="debug",  help='Dispara las excepciones para facilitar la detección de bugs.', default=False, action='store_true')
 
-
     # Si no hay enlace entonces se muestra la ayuda y sale
     if len(sys.argv)==1:
         parser.print_help()
@@ -236,5 +241,4 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         exit(1)
     except Exception as e:
-        if debug == True: raise e
-        else: print("error:", e)
+        debugger(e, True)
