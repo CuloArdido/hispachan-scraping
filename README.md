@@ -29,25 +29,37 @@ No descarga los videos, los selecciona pero aun no los maneja
 ## Descripción
 Versión del scrapper hecha en Python. Actualmente se encuentra en [esta rama](../../tree/python).
 ## Dependencias
-Python 3.
+Python 2 o 3 (no requiere módulos adicionales).
 ## Uso
 
 ```
-Uso: hispachan-scraping.py [opciones] <url del hilo o tablon/hilo> [<destino>]
-Opciones:
-    -no-subfolder     Omite la creación de una subcarpeta para las imágenes.
-    -overwrite        Sobrescribe los archivos con el mismo nombre.
-    -update           Solo descarga los archivos que no existen.
+Uso: hispachan-scraping.py [-h] [-n] [-o] [-u] [-d] url [destino]
+
+Descarga los archivos adjuntos de un hilo de Hispachan.
+
+Argumentos posicionales:
+  url                Enlace del hilo o identificador en la forma
+                     "tablón/hilo".
+  destino            Directorio en donde se guardaran los archivos (por
+                     defecto se descargan en el directorio actual).
+
+Argumentos opcionales:
+  -h, -help          Muestra este mensaje de ayuda y sale.
+  -n, -no-subfolder  Omite la creación de una subcarpeta para las imágenes.
+  -o, -overwrite     Sobrescribe los archivos con el mismo nombre.
+  -u, -update        Solo descarga los archivos que no existen.
+  -d, -debug         Dispara las excepciones para facilitar la detección de
+                     bugs.
 ```
 
 ## Bugs conocidos
 Ninguno por ahora, pero faltaría hacer mas pruebas con la expresión regular que detecta enlaces y nombres reales de los archivos.
 
 ## Por hacer
-☐ Agregar un modo de depuración/verbose (al menos para mostrar mas detalles cuando se da una excepción).
+☑ Agregar un modo de depuración/verbose (al menos para mostrar mas detalles cuando se da una excepción).
 
-☐ Hacer que funcione en Python 2.
+☑ Hacer que funcione en Python 2.
 
 ☐ Agregar soporte para descargar desde varios hilos a la vez (ya sea en la consola o a través de un archivo).
 
-☐ Quizás crear una interfaz gráfica y/o una webapp.
+☐ Quizás crear una interfaz gráfica y/o una webapp (esto ultimo podría ser con Django o Flask).
